@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<!-- saved from url=(1063)https://wix.ecwid.com/wix/app/cart_v2?pageId=masterPage&compId=comp-jpbj95eq&viewerCompId=comp-jpbj95eq&siteRevision=4&viewMode=site&deviceType=desktop&locale=es&regionalLanguage=es&width=106&height=106&instance=64eh77MfwtlCrsi9bNA71M-s5t2KOk6e8O9IpcBlyYE.eyJpbnN0YW5jZUlkIjoiYzZjYTY2ZWMtNzAxNy00M2ZkLTg2N2UtMmJlNDgxYTFlMWViIiwiYXBwRGVmSWQiOiIxMmYxZmJhYi04YjlkLTMwMDItODdiNS0yOTcyODk3ZTgzMTQiLCJzaWduRGF0ZSI6IjIwMjUtMDEtMDhUMTM6NDA6NDYuMDIwWiIsImRlbW9Nb2RlIjpmYWxzZSwiYWlkIjoiZjA2MjVhMjUtOTY1Ny00ZmFlLTgyYzYtZmFjNWJkYzIyMzBmIiwic2l0ZU93bmVySWQiOiIyODkyZDdjOC03YmVkLTRmM2ItYjFmNC04NDg1NWQ5MDdjNzUifQ&currency=USD&currentCurrency=USD&commonConfig=%7B%22brand%22%3A%22wix%22%2C%22host%22%3A%22VIEWER%22%2C%22bsi%22%3A%22f8f4b36b-fea9-457f-8645-932698f39810%7C1%22%2C%22siteRevision%22%3A%224%22%2C%22branchId%22%3A%2249f657f4-c442-4e5f-9ac8-1c4e02aa8797%22%2C%22renderingFlow%22%3A%22NONE%22%2C%22language%22%3A%22es%22%2C%22locale%22%3A%22%22%2C%22BSI%22%3A%22f8f4b36b-fea9-457f-8645-932698f39810%7C1%22%7D&currentRoute=.%2F&vsi=6eefc2a2-c284-4331-98b5-1f33c04976bd -->
+<html id="ecwid_html"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<script type="text/javascript" src="./wix.min.js.descarga"></script>
+<script src="./jquery.min.js.descarga"></script>
+<script type="text/javascript">
+	function getPageId() {
+		return 'alyep';
+	}
+</script>
+<link rel="stylesheet" href="./widget.css">
+<script type="text/javascript" src="./storage.js.descarga"></script>
+<script type="text/javascript" src="./widget.js.descarga"></script>
+	<script type="text/javascript">
+		window.ec = window.ec || {};
+		window.ec.storefront = window.ec.storefront || {};
+		window.ec.config = window.ec.config || {};
+		window.ec.config.isShowPBPopupDisabled = true;
+
+		setAlwaysNavigateToStorePage(false);
+
+		var IFRAME_PADDING = 70;
+		var CHECK_MINICART_SIZE_INTERVAL_MS = 5;
+		var CHECK_MINICART_DURATION_SEC = 30;
+		var minicartV1IsInitialized = false;
+		var minicartV2IsInitialized = false;
+		var cartWidgetHidden = false;
+		var resizeIframeIntervalId = null;
+
+		var draftSettingsOnServer = null;
+		var draftSettingsSameAsPublished = true;
+
+		function isInsideWixEditor() {
+			return Wix.Utils.getViewMode() === 'editor' || Wix.Utils.getViewMode() === 'preview';
+		}
+
+		if (isInsideWixEditor()) {
+			window.ec.storefront.cart_widget_icon = 'BAG';
+			window.ec.storefront.cart_widget_fixed_shape = 'PILL';
+			window.ec.storefront.cart_widget_layout = 'MEDIUM_ICON_COUNTER';
+		} else {
+			window.ec.storefront.cart_widget_icon = 'BAG';
+			window.ec.storefront.cart_widget_fixed_shape = 'PILL';
+			window.ec.storefront.cart_widget_layout = 'MEDIUM_ICON_COUNTER';
+		}
+
+		(function() {
+			$(document).ready(function() {
+				/**********************************************************************/
+				/********************** Код интеграции с Wix **************************/
+				/**********************************************************************/
+
+				var lastAppliedParams = null;
+
+				var cartWidgetHiddenWhenEmpty = true;
+				if (isInsideWixEditor()) {
+					cartWidgetHiddenWhenEmpty = true;
+				} else {
+					cartWidgetHiddenWhenEmpty = true;
+				}
+
+				Wix.addEventListener(Wix.Events.EDIT_MODE_CHANGE, function(data) {
+					if (data.editMode === 'preview') {
+						saveSettings("DRAFT");
+					}
+				});
+
+				Wix.addEventListener(Wix.Events.SITE_SAVED, function() {
+					saveSettings("DRAFT");
+				});
+
+				Wix.addEventListener(Wix.Events.SITE_PUBLISHED, function() {
+					saveSettings("PUBLISH");
+				});
+
+				Wix.addEventListener(Wix.Events.STYLE_PARAMS_CHANGE, function(params) {
+					if (Wix.Utils.getViewMode() === 'editor') {
+						lastAppliedParams = params;
+						applyWixStyleParams(params);
+
+						if (draftSettingsOnServer === null) {
+							draftSettingsOnServer = buildProfile(lastAppliedParams, 'DRAFT').draftSettings;
+						}
+					}
+				});
+
+				function applyWixStyleParams(params) {
+					if (window.Ecwid && window.Ecwid.refreshConfig && params) {
+						var consts = getConsts();
+
+						params.numbers = params.numbers || {};
+						params.booleans = params.booleans || {};
+
+						if (typeof params.numbers.cartWidgetIcon !== 'undefined') {
+							window.ec.storefront.cart_widget_icon = consts.cartWidgetIconValues[params.numbers.cartWidgetIcon];
+						}
+						if (typeof params.numbers.cartWidgetFixedShape !== 'undefined') {
+							window.ec.storefront.cart_widget_fixed_shape = consts.cartWidgetFixedShapeValues[params.numbers.cartWidgetFixedShape];
+						}
+
+						var cartWidgetLayout = consts.cartWidgetLayoutValues[params.numbers.cartWidgetLayout];
+						if (typeof cartWidgetLayout !== 'undefined' && cartWidgetLayout !== 'SQUARE_BAG_LEGACY_MODE') {
+							window.ec.storefront.cart_widget_layout = cartWidgetLayout;
+						}
+
+						if (typeof params.booleans.cartWidgetHiddenWhenEmpty !== 'undefined') {
+							cartWidgetHiddenWhenEmpty = params.booleans.cartWidgetHiddenWhenEmpty;
+						}
+
+						Ecwid.refreshConfig();
+						resizeIframeToFitMinicart();
+
+						saveSettings("DRAFT");
+					}
+				}
+
+				Ecwid.OnAPILoaded.add(function() {
+					Ecwid.Cart.get(function(cart) {
+						updateMinicartView(cart);
+					});
+
+					Ecwid.OnCartChanged.add(function(cart) {
+						updateMinicartView(cart);
+					});
+				});
+
+				function updateMinicartView(cart) {
+					if (cart.productsQuantity === 0 && cartWidgetHiddenWhenEmpty && !isInsideWixEditor()) {
+						cartWidgetHidden = true;
+						clearResizeIframeInterval();
+						Wix.resizeWindow(0, 0);
+					} else {
+						cartWidgetHidden = false;
+						resizeIframeToFitMinicart();
+					}
+				}
+
+				function resizeIframeToFitMinicart() {
+					if (cartWidgetHidden === true) {
+						return;
+					}
+
+					clearResizeIframeInterval();
+
+					var counter = (1000 / CHECK_MINICART_SIZE_INTERVAL_MS) * CHECK_MINICART_DURATION_SEC;
+					resizeIframeIntervalId = setInterval(function() {
+						var minicartWidth = $("#minicart-v2 .ec-minicart").width();
+						var minicartHeight = $("#minicart-v2 .ec-minicart").height();
+
+						var iframeWidth = minicartWidth + IFRAME_PADDING;
+						var iframeHeight = minicartHeight + IFRAME_PADDING;
+
+						Wix.resizeWindow(iframeWidth, iframeHeight);
+
+						counter--;
+						if (counter === 0) {
+							clearInterval(resizeIframeIntervalId);
+							resizeIframeIntervalId = null;
+						}
+					}, CHECK_MINICART_SIZE_INTERVAL_MS);
+				}
+
+				function clearResizeIframeInterval() {
+					if (resizeIframeIntervalId !== null) {
+						clearInterval(resizeIframeIntervalId);
+					}
+				}
+
+				var saveSettingsTimer;
+				function saveSettings(mode) {
+					var profile = buildProfile(lastAppliedParams, mode);
+
+					if (saveSettingsTimer !== undefined) {
+						clearTimeout(saveSettingsTimer);
+					}
+					saveSettingsTimer = setTimeout(function () {
+						saveSettingsTimer = undefined;
+
+						if (profile.publishedSettings && !draftSettingsSameAsPublished
+								|| profile.draftSettings && JSON.stringify(profile.draftSettings) !== JSON.stringify(draftSettingsOnServer)) {
+
+							$.ajax({
+								type: 'PUT',
+								url: '/wix/app/profile?instance=64eh77MfwtlCrsi9bNA71M-s5t2KOk6e8O9IpcBlyYE.eyJpbnN0YW5jZUlkIjoiYzZjYTY2ZWMtNzAxNy00M2ZkLTg2N2UtMmJlNDgxYTFlMWViIiwiYXBwRGVmSWQiOiIxMmYxZmJhYi04YjlkLTMwMDItODdiNS0yOTcyODk3ZTgzMTQiLCJzaWduRGF0ZSI6IjIwMjUtMDEtMDhUMTM6NDA6NDYuMDIwWiIsImRlbW9Nb2RlIjpmYWxzZSwiYWlkIjoiZjA2MjVhMjUtOTY1Ny00ZmFlLTgyYzYtZmFjNWJkYzIyMzBmIiwic2l0ZU93bmVySWQiOiIyODkyZDdjOC03YmVkLTRmM2ItYjFmNC04NDg1NWQ5MDdjNzUifQ&debugInfo=OnCartSaveSettings',
+								data: JSON.stringify(profile),
+								dataType: 'json',
+								contentType: 'application/json; charset=UTF-8',
+								complete: function () {
+									draftSettingsSameAsPublished = profile.publishedSettings !== undefined;
+									if (profile.draftSettings) {
+										draftSettingsOnServer = profile.draftSettings;
+									}
+								}
+							});
+						}
+					}, 1000);
+				}
+
+				function buildProfile(params, mode) {
+					if (!params) {
+						return {};
+					}
+
+					var settings = {};
+
+					var consts = getConsts();
+					if ('ENDPOINT_V2' === 'ENDPOINT_V1') {
+						settings.cartWidgetV1Icon = consts.cartWidgetIconValues[params.numbers.cartWidgetIcon];
+						settings.cartWidgetV1FixedShape = consts.cartWidgetFixedShapeValues[params.numbers.cartWidgetFixedShape];
+						settings.cartWidgetV1Layout = consts.cartWidgetLayoutValues[params.numbers.cartWidgetLayout];
+					} else {
+						settings.cartWidgetV2Icon = consts.cartWidgetIconValues[params.numbers.cartWidgetIcon];
+						settings.cartWidgetV2FixedShape = consts.cartWidgetFixedShapeValues[params.numbers.cartWidgetFixedShape];
+						settings.cartWidgetV2Layout = consts.cartWidgetLayoutValues[params.numbers.cartWidgetLayout];
+					}
+					settings.cartWidgetHiddenWhenEmpty = params.booleans.cartWidgetHiddenWhenEmpty;
+
+					if (mode === 'PUBLISH') {
+						return {
+							publishedSettings: settings
+						};
+					} else {
+						return {
+							draftSettings: settings
+						};
+					}
+				}
+
+				function getConsts() {
+					return {
+						cartWidgetLayoutValues: ["SMALL_ICON","SMALL_ICON_COUNTER","COUNTER_ONLY","TITLE_COUNTER","MEDIUM_ICON_COUNTER","MEDIUM_ICON_TITLE_COUNTER","BIG_ICON_TITLE_SUBTOTAL","BIG_ICON_DETAILS_SUBTOTAL","SQUARE_BAG_LEGACY_MODE"],
+						cartWidgetIconValues: ["BAG","CART","BASKET"],
+						cartWidgetFixedShapeValues: ["PILL","RECT","NONE"]
+					};
+				}
+			});
+		})();
+
+			window.ec = window.ec || {};
+			window.ec.config = window.ec.config || {};
+			window.ec.config.chameleon = window.ec.config.chameleon || {};
+			window.ec.config.chameleon.colors = window.ec.config.chameleon.colors || {};
+			var colors = window.ec.config.chameleon.colors;
+			colors['color-foreground'] = 'rgba(51,51,51,1)';
+			colors['color-link'] = 'rgba(30,126,200,1)';
+			colors['color-button'] = 'rgba(67,156,160,1)';
+			colors['color-price'] = 'rgba(162,5,5,1)';
+			colors['color-background'] = updateOpacity('rgba(255,255,255,1)', 0);
+			var fontFamily = '';
+			if (!!fontFamily) {
+				var font = window.ec.config.chameleon.font || {};
+				font['font-family'] = fontFamily;
+				window.ec.config.chameleon.font = font;
+			}
+
+			function hex2rgba(hex, opacity) {
+				hex = hex.replace('#', '');
+				var r = parseInt(hex.substring(0, 2), 16);
+				var g = parseInt(hex.substring(2, 4), 16);
+				var b = parseInt(hex.substring(4, 6), 16);
+
+				var result = 'rgba(' + r + ',' + g + ',' + b + ',' + opacity / 100 + ')';
+				return result;
+			}
+
+			function updateOpacity(color, opacity) {
+				if (!color) {
+					return null;
+				}
+
+				if (color.indexOf('#') === 0) {
+					return hex2rgba(color, opacity)
+				}
+
+				if (color.indexOf('rgba(') === 0) {
+					var colors = color.replace('rgba(', '').split(',').map(function(x){ return parseInt(x, 10); })
+					var r = colors[0];
+					var g = colors[1];
+					var b = colors[2];
+					return 'rgba(' + r + ',' + g + ',' + b + ',' + opacity / 100 + ')';
+				}
+			}
+	</script>
+<script type="module" src="./ecommerce.js.descarga"></script><style type="text/css">:root [href^="//mage98rquewz.com/"], :root [href^="//x4pollyxxpush.com/"], :root span[id^="ezoic-pub-ad-placeholder-"], :root ins.adsbygoogle[data-ad-slot], :root ins.adsbygoogle[data-ad-client], :root guj-ad, :root gpt-ad, :root div[id^="zergnet-widget"], :root div[id^="vuukle-ad-"], :root div[id^="taboola-stream-"], :root div[id^="sticky_ad_"], :root div[id^="st"][style^="z-index: 999999999;"], :root div[id^="pa_sticky_ad_box_middle_"], :root div[id^="gpt_ad_"], :root div[id^="ezoic-pub-ad-"], :root div[id^="dfp-ad-"], :root div[id^="crt-"][style], :root div[id^="adspot-"], :root div[id^="adrotate_widgets-"], :root ps-connatix-module, :root div[id^="ad_position_"], :root div[id^="ad-div-"], :root div[id*="ScriptRoot"], :root div[id*="MarketGid"], :root div[data-id-advertdfpconf], :root hl-adsense, :root div[data-contentexchange-widget], :root div[data-alias="300x250 Ad 2"], :root div[data-adzone], :root div[data-adunit-path], :root div[data-adname], :root div[data-ad-targeting], :root div[data-ad-placeholder], :root div[class^="native-ad-"], :root div[data-dfp-id], :root div[class^="kiwi-ad-wrapper"], :root div[aria-label="Ads"], :root display-ads, :root display-ad-component, :root atf-ad-slot, :root aside[id^="adrotate_widgets-"], :root ark-top-ad, :root amp-fx-flying-carpet, :root amp-embed[type="taboola"], :root amp-connatix-player, :root amp-ad-custom, :root amp-ad, :root div[id^="google_dfp_"], :root ad-slot, :root ad-shield-ads, :root a[style="width:100%;height:100%;z-index:10000000000000000;position:absolute;top:0;left:0;"], :root a[onmousedown^="this.href='https://paid.outbrain.com/network/redir?"][target="_blank"] + .ob_source, :root a[href^="https://xbet-4.com/"], :root div[id^="ad-position-"], :root a[href^="https://www.toprevenuegate.com/"], :root a[href^="https://www.purevpn.com/"][href*="&utm_source=aff-"], :root a[href^="https://www.privateinternetaccess.com/"] > img, :root a[href^="https://www.onlineusershielder.com/"], :root a[href^="https://financeads.net/tc.php?"], :root a[href^="https://www.mrskin.com/tour"], :root a[href^="https://www.infowarsstore.com/"] > img, :root a[href^="https://www.highperformancecpmgate.com/"], :root a[href^="https://www.highcpmrevenuenetwork.com/"], :root a[href^="https://lnkxt.bannerator.com/"], :root a[href^="https://www.geekbuying.com/dynamic-ads/"], :root a[href^="https://www.financeads.net/tc.php?"], :root [href^="https://www.herbanomic.com/"] > img, :root a[href^="https://maymooth-stopic.com/"], :root a[href^="https://www.dql2clk.com/"], :root a[href^="https://www.nutaku.net/signup/landing/"], :root a[href^="https://www.dating-finder.com/signup/?ai_d="], :root a[href^="https://explore-site.com/"], :root a[href^="https://www.brazzersnetwork.com/landing/"], :root a[href^="https://www.adxsrve.com/"], :root [data-template-type="nativead"], :root a[href^="https://www.endorico.com/Smartlink/"], :root a[href^="https://www.adultempire.com/"][href*="?partner_id="], :root a[href^="https://voluum.prom-xcams.com/"], :root a[href^="https://twinrdsrv.com/"], :root a[href^="https://trk.nfl-online-streams.club/"], :root a[href^="https://tracking.avapartner.com/"], :root a[href^="https://track.wg-aff.com"], :root a[href^="https://track.ultravpn.com/"], :root a[href^="https://track.afcpatrk.com/"], :root a[href^="https://torguard.net/aff.php"] > img, :root [data-identity="adhesive-ad"], :root a[href^="https://tc.tradetracker.net/"] > img, :root a[href^="https://tatrck.com/"], :root a[href^="https://click.candyoffers.com/"], :root [href^="https://zstacklife.com/"] img, :root a[href^="https://t.aslnk.link/"], :root a[href^="https://t.adating.link/"], :root a[href^="https://land.brazzersnetwork.com/landing/"], :root a[href^="https://t.acam.link/"], :root a[href*="//daichoho.com/"], :root a[href^="https://syndication.optimizesrv.com/"], :root a[href^="https://go.trackitalltheway.com/"], :root [href^="https://track.fiverr.com/visit/"] > img, :root a[href^="https://syndication.exoclick.com/"], :root a[href^="https://syndication.dynsrvtbg.com/"], :root div[data-alias="300x250 Ad 1"], :root a[href^="https://syndicate.contentsserved.com/"], :root a[href^="https://svb-analytics.trackerrr.com/"], :root a[href^="https://ad.doubleclick.net/"], :root a[href^="https://static.fleshlight.com/images/banners/"], :root a[href^="https://slkmis.com/"], :root bottomadblock, :root a[href^="https://s.zlinkd.com/"], :root a[href^="https://s.zlink3.com/"], :root a[href^="https://www.mrskin.com/account/"], :root a[href^="https://s.optzsrv.com/"], :root #kt_player > div[style$="display: block;"][style*="inset: 0px;"], :root a[href^="https://quotationfirearmrevision.com/"], :root a[href^="https://pubads.g.doubleclick.net/"], :root a[href^="https://ak.oalsauwy.net/"], :root a[href^="https://softwa.cfd/"], :root a[href^="https://play1ad.shop/"], :root a[href^="https://prf.hn/click/"][href*="/camref:"] > img, :root a[href^="https://www.dating-finder.com/?ai_d="], :root a[href^="https://serve.awmdelivery.com/"], :root a[href^="https://prf.hn/click/"][href*="/adref:"] > img, :root app-ad, :root [href^="https://ap.octopuspop.com/click/"] > img, :root a[href^="https://postback1win.com/"], :root a[href^="https://mmwebhandler.aff-online.com/"], :root a[href^="https://www.bet365.com/"][href*="affiliate="], :root a[href^="https://pb-track.com/"], :root a[href^="https://pb-front.com/"], :root a[href^="https://paid.outbrain.com/network/redir?"], :root a[href^="https://streamate.com/landing/click/"], :root div[class^="Adstyled__AdWrapper-"], :root a[href^="https://startgaming.net/tienda/" i], :root a[href^="https://osfultrbriolenai.info/"], :root a[href^="https://upsups.click/"], :root a[href^="https://ndt5.net/"], :root a[href^="http://eighteenderived.com/"], :root a[href^="https://natour.naughtyamerica.com/track/"], :root a[href^="https://mediaserver.entainpartners.com/renderBanner.do?"], :root a[href^="https://m.do.co/c/"] > img, :root .nya-slot[style], :root a[href^="https://a.bestcontentweb.top/"], :root a[href^="https://lobimax.com/"], :root a[href^="https://lead1.pl/"], :root a[href^="https://landing.brazzersnetwork.com/"], :root a[href^="https://join.virtuallust3d.com/"], :root a[href^="https://kiksajex.com/"], :root a[href^="https://juicyads.in/"], :root a[href^="https://snowdayonline.xyz/"], :root a[href^="https://mediaserver.gvcaffiliates.com/renderBanner.do?"], :root a[href^="https://join.dreamsexworld.com/"], :root a[href^="https://jaxofuna.com/"], :root a[href^="https://itubego.com/video-downloader/?affid="], :root a[href^="https://italarizege.xyz/"], :root a[href^="https://iqbroker.com/"][href*="?aff="], :root a[href^="https://hot-growngames.life/"], :root a[href^="https://helmethomicidal.com/"], :root a[href^="https://golinks.work/"], :root a[href^="https://go.xxxvjmp.com/"], :root [class^="tile-picker__CitrusBannerContainer-sc-"], :root a[href^="https://go.xxxiijmp.com"], :root a[href^="https://go.xtbaffiliates.com/"], :root [data-role="tile-ads-module"], :root a[href^="https://go.xlviirdr.com"], :root a[href^="https://go.xlviiirdr.com"], :root a[href^="https://ismlks.com/"], :root [href^="https://www.mypillow.com/"] > img, :root a[href^="https://go.xlirdr.com"], :root [data-css-class="dfp-inarticle"], :root a[href^="https://l.hyenadata.com/"], :root a[href^="https://go.tmrjmp.com"], :root a[href^="https://zirdough.net/"], :root a[href^="https://s.deltraff.com/"], :root a[href^="https://go.markets.com/visit/?bta="], :root a[href^="https://billing.purevpn.com/aff.php"] > img, :root a[href^="https://go.hpyrdr.com/"], :root a[href^="https://lijavaxa.com/"], :root a[href^="https://go.goaserv.com/"], :root a[href^="https://t.hrtye.com/"], :root a[href^="https://go.etoro.com/"] > img, :root a[href^="https://go.dmzjmp.com"], :root div[class^="Display_displayAd"], :root a[href^="https://www.bang.com/?aff="], :root #mgb-container > #mgb, :root a[href^="https://go.admjmp.com"], :root a[href^="https://ak.stikroltiltoowi.net/"], :root a[href^="https://get.surfshark.net/aff_c?"][href*="&aff_id="] > img, :root a[href^="https://www.adskeeper.com"], :root a[data-redirect^="https://paid.outbrain.com/network/redir?"], :root [href^="https://clicks.affstrack.com/"] > img, :root a[href^="https://ak.hauchiwu.com/"], :root a[href^="https://engine.phn.doublepimp.com/"], :root a[href^="https://engine.blueistheneworanges.com/"], :root a[href^="https://drumskilxoa.click/"], :root a[href^="https://dl-protect.net/"], :root a[href^="https://rixofa.com/"], :root #ads[style^="position: absolute; z-index: 30; width: 100%; height"], :root a[href^="https://disobediencecalculatormaiden.com/"], :root a[href*=".foxqck.com/"], :root a[href^="https://ctosrd.com/"], :root a[href^="https://clixtrac.com/"], :root [href^="https://noqreport.com/"] > img, :root a[href^="https://clicks.pipaffiliates.com/"], :root app-advertisement, :root a[href^="https://getmatchedlocally.com/"], :root a[href^="https://clickins.slixa.com/"], :root a[href^="https://datewhisper.life/"], :root a[href^="https://get-link.xyz/"], :root a[href^="https://click.linksynergy.com/fs-bin/"] > img, :root a[href^="https://combodef.com/"], :root a[href^="https://click.hoolig.app/"], :root a[href^="https://track.totalav.com/"], :root a[href^="https://ctrdwm.com/"], :root img[src^="https://images.purevpnaffiliates.com"], :root a[href^="https://porntubemate.com/"], :root a[href^="https://clickadilla.com/"], :root a[href^="https://click.dtiserv2.com/"], :root a[href^="https://go.xlvirdr.com"], :root a[href^="http://www.iyalc.com/"], :root a[href^="https://claring-loccelkin.com/"], :root a[href^="https://s.ma3ion.com/"], :root a[href^="https://cams.imagetwist.com/in/?track="], :root a[href^="https://bongacams2.com/track?"], :root a[href^="https://t.ajrkm1.com/"], :root [href="https://masstortfinancing.com"] img, :root a[href^="https://bongacams10.com/track?"], :root a[href^="https://www.sheetmusicplus.com/"][href*="?aff_id="], :root a[href^="https://bngpt.com/"], :root a[href^="https://black77854.com/"], :root a[href^="https://banners.livepartners.com/"], :root a[href^="http://revolvemockerycopper.com/"], :root a[href^="https://awptjmp.com/"], :root a[href^="https://join.sexworld3d.com/track/"], :root a[href^="https://intenseaffiliates.com/redirect/"], :root a[href^="https://aweptjmp.com/"], :root [class^="s2nPlayer"], :root a[href^="https://chaturbate.jjgirls.com/?track="], :root a[href^="https://ausoafab.net/"], :root a[href^="https://activate-game.com/"], :root .scroll-fixable.rail-right > .deals-rail, :root [data-wpas-zoneid], :root a[href^="https://a2.adform.net/"], :root a[href^="https://auesk.cfd/"], :root a[href^="https://ak.psaltauw.net/"], :root a[href^="https://adclick.g.doubleclick.net/"], :root a[href^="https://bc.game/"], :root a[href^="https://a.bestcontentoperation.top/"], :root a[href^="https://adultfriendfinder.com/go/"], :root a[href^="https://ads.planetwin365affiliate.com/"], :root a[href^="https://ads.leovegas.com/"], :root a[href^="https://a.candyai.love/"], :root a[href^="https://playnano.online/offerwalls/?ref="], :root a[href^="https://a.adtng.com/"], :root [data-m-ad-id], :root a[href^="https://a-ads.com/"], :root div[id^="rc-widget-"], :root a[href^="http://eslp34af.click/"], :root a[href^="https://turnstileunavailablesite.com/"], :root a[href^="https://chaturbate.com/in/?"], :root a[href^="https://prf.hn/click/"][href*="/creativeref:"] > img, :root a[href*="&maxads="], :root a[href^="http://www.adultempire.com/unlimited/promo?"][href*="&partner_id="], :root a[href^="https://1betandgonow.com/"], :root a[href^="https://eergortu.net/"], :root div[id^="optidigital-adslot"], :root a[href^="https://123-stream.org/"], :root a[href^="http://www.friendlyduck.com/AF_"], :root a[href^="https://allhost.shop/aff.php?"], :root [data-dynamic-ads], :root a[href^="http://vnte9urn.click/"], :root a[href^="https://getvideoz.click/"], :root a[href^="http://troopsassistedstupidity.com/"], :root a[href^="http://trk.globwo.online/"], :root a[href^="https://random-affiliate.atimaze.com/"], :root a-ad, :root a[href^="https://offhandpump.com/"], :root a[href^="http://stickingrepute.com/"], :root #slashboxes > .deals-rail, :root a[href^="http://premonitioninventdisagree.com/"], :root a[href^="http://naggingirresponsible.com/"], :root a[href^="https://in.rabbtrk.com/"], :root a[href^="http://www.h4trck.com/"], :root a[href^="https://81ac.xyz/"], :root a[href^="http://guestblackmail.com/"], :root a[href^="http://cam4com.go2cloud.org/aff_c?"], :root a[href^="https://ads.betfair.com/redirect.aspx?"], :root [href^="https://www.mypatriotsupply.com/"] > img, :root a[href^="https://trk.softonixs.xyz/"], :root a[href^="https://sexynearme.com/"], :root a[href^="https://myclick-2.com/"], :root a[href^="http://dragnag.com/"], :root a[href^="http://dragfault.com/"], :root [id^="div-gpt-ad"], :root .ob_container .item-container-obpd, :root div[id^="yandex_ad"], :root a[href^="https://www8.smartadserver.com/"], :root a[href^="https://pb-imc.com/"], :root a[href^="http://deskfrontfreely.com/"], :root [data-advadstrackid], :root a[href^="http://muzzlematrix.com/"], :root a[href^="https://track.adform.net/"], :root a[href^="http://avthelkp.net/"], :root a[href^="https://a.medfoodhome.com/"], :root a[href^="https://engine.flixtrial.com/"], :root [data-type="ad-vertical"], :root [data-taboola-options], :root a[href^="http://annulmentequitycereals.com/"], :root a[href^="//startgaming.net/tienda/" i], :root a[href^="https://www.get-express-vpn.com/offer/"], :root a[href^="https://s.cant3am.com/"], :root a[href^="//s.st1net.com/splash.php"], :root a[href^="https://join.virtualtaboo.com/track/"], :root [id^="ad_sky"], :root a[href^="http://coefficienttolerategravel.com/"], :root a[href^="https://a.medfoodsafety.com/"], :root a[href^="//go.eabids.com/"], :root a[href^="//ejitsirdosha.net/"], :root a[href^=" https://www.friendlyduck.com/AF_"], :root a[href*="/jump/next.php?r="], :root [href^="https://ilovemyfreedoms.com/landing-"], :root a[href^="https://go.nordvpn.net/aff"] > img, :root .\[\&_\.gdprAdTransparencyCogWheelButton\]\:\!pjra-z-\[5\], :root [href^="http://clicks.totemcash.com/"], :root a[href^="https://ad.zanox.com/ppc/"] > img, :root a[href^="https://lone-pack.com/"], :root [data-d-ad-id], :root a[href*=".engine.adglare.net/"], :root a[href^="https://t.ajrkm3.com/"], :root [href^="https://aads.com/campaigns/"], :root a[href^="//stighoazon.com/"], :root [href^="https://www.profitablegatecpm.com/"], :root div[id^="lazyad-"], :root a[href^="http://com-1.pro/"], :root a[href*=".cfm?domain="][href*="&fp="], :root [data-ad-name], :root a[href^="https://loboclick.com/"], :root a[data-url^="https://vulpix.bet/?ref="], :root a[href^="https://ab.advertiserurl.com/aff/"], :root a[data-oburl^="https://paid.outbrain.com/network/redir?"], :root a[href^="https://go.xlivrdr.com"], :root [onclick^="location.href='https://1337x.vpnonly.site/"], :root [name^="google_ads_iframe"], :root [id^="section-ad-banner"], :root a[href^="https://www.goldenfrog.com/vyprvpn?offer_id="][href*="&aff_id="], :root a[href*="//jjgirls.com/sex/Chaturbate"], :root [id^="ad-wrap-"], :root [href^="https://zone.gotrackier.com/"], :root a[href^="http://sarcasmadvisor.com/"], :root [href^="https://www.restoro.com/"], :root [href^="https://www.targetingpartner.com/"], :root .section-subheader > .section-hotel-prices-header, :root [href^="https://www.hostg.xyz/"] > img, :root a[href^="http://adultfriendfinder.com/go/"], :root a[href^="https://fastestvpn.com/lifetime-special-deal?a_aid="], :root a[href^="https://tour.mrskin.com/"], :root [href^="https://www.brighteonstore.com/products/"] img, :root citrus-ad-wrapper, :root a[onmousedown^="this.href='https://paid.outbrain.com/network/redir?"][target="_blank"], :root a[href^="https://go.grinsbest.com/"], :root a[href^="https://vo2.qrlsx.com/"], :root [href^="https://www.avantlink.com/click.php"] img, :root [data-ad-width], :root [data-block-type="ad"], :root a[href^="https://baipahanoop.net/"], :root [href^="https://v.investologic.co.uk/"], :root div[id^="div-ads-"], :root [href^="https://rapidgator.net/article/premium/ref/"], :root [href^="https://join.girlsoutwest.com/"], :root a[href^="https://track.aftrk3.com/"], :root [href^="https://join3.bannedsextapes.com"], :root a[href^="https://bodelen.com/"], :root a[href*=".g2afse.com/"], :root div[id^="adngin-"], :root [data-rc-widget], :root span[data-ez-ph-id], :root [href^="https://track.aftrk1.com/"], :root [href^="https://join.playboyplus.com/track/"], :root a[href^="https://go.xxxijmp.com"], :root [href^="https://istlnkcl.com/"], :root div[data-adunit], :root app-large-ad, :root [href^="https://turtlebids.irauctions.com/"] img, :root [href^="https://wct.link/click?"], :root [href^="https://go.xlrdr.com"], :root a[href^="https://tm-offers.gamingadult.com/"], :root [href^="https://charmingdatings.life/"], :root [href^="https://glersakr.com/"], :root a[href^="https://a.bestcontentfood.top/"], :root [href^="https://cpa.10kfreesilver.com/"], :root [data-id^="div-gpt-ad"], :root a[href^="https://tracker.loropartners.com/"], :root [href^="https://awbbjmp.com/"], :root a[data-href^="http://ads.trafficjunky.net/"], :root a[href^="http://partners.etoro.com/"], :root a[href^="https://www.friendlyduck.com/AF_"], :root [href^="https://ad1.adfarm1.adition.com/"], :root a[href^="https://bngprm.com/"], :root [href^="https://shiftnetwork.infusionsoft.com/go/"] > img, :root a[href^="https://go.strpjmp.com/"], :root a[href^="https://go.bushheel.com/"], :root a[href^="https://ctjdwm.com/"], :root a[href^="https://camfapr.com/landing/click/"], :root div[data-ad-wrapper], :root .gnt_em_vp_c[data-g-s="vp_dk"], :root [href="//sexcams.plus/"], :root [href^="http://www.mypillow.com/"] > img, :root #kt_player > a[target="_blank"], :root a[href^="http://bongacams.com/track?"], :root [href^="http://mypillow.com/"] > img, :root [href="https://ourgoldguy.com/contact/"] img, :root #teaser3[style="width: 100%;text-align: center;display: scroll;position:fixed;bottom: 0;margin: 0 auto;z-index: 103;"], :root [href="https://www.masstortfinancing.com/"] > img, :root a[href^="https://go.rmhfrtnd.com/"], :root [href="https://jdrucker.com/gold"] > img, :root a[href^="https://track.1234sd123.com/"], :root zeus-ad, :root [data-testid="prism-ad-wrapper"], :root [href^="https://ad.admitad.com/"], :root [href^="https://mypillow.com/"] > img, :root [data-testid="ad_testID"], :root [href^="https://antiagingbed.com/discount/"] > img, :root a[href*=".adsrv.eacdn.com/"], :root [href^="https://optimizedelite.com/"] > img, :root [data-name="adaptiveConstructorAd"], :root a[href^="https://go.cmtaffiliates.com/"], :root [data-testid="adBanner-wrapper"], :root [href^="https://mylead.global/stl/"] > img, :root [href^="https://mypatriotsupply.com/"] > img, :root a[href^="https://go.hpyjmp.com"], :root [href^="https://mystore.com/"] > img, :root a[href^="https://witnessjacket.com/"], :root [data-mobile-ad-id], :root [class^="amp-ad-"], :root a[href^="http://handgripvegetationhols.com/"], :root a[href^="https://bs.serving-sys.com"], :root a[href^="https://fc.lc/ref/"], :root [data-adshim], :root topadblock, :root a[href^="//s.zlinkd.com/"], :root #teaser1[style^="width:autopx;"], :root [href^="https://www.cloudways.com/en/?id"], :root [data-asg-ins], :root a[href^="https://gamingadlt.com/?offer="], :root [data-desktop-ad-id], :root a[href^="https://www.liquidfire.mobi/"], :root .grid > .container > #aside-promotion, :root DFP-AD, :root [id^="ad_slider"], :root [data-adbridg-ad-class], :root #teaser3[style^="width:autopx;"], :root [data-adblockkey], :root [onclick*="content.ad/"], :root [data-ad-manager-id], :root AMP-AD, :root [data-ad-cls], :root [data-ez-name], :root a[href^="https://go.mnaspm.com/"], :root a[href^="https://service.bv-aff-trx.com/"], :root a[href^="https://6-partner.com/"], :root a[href^="https://traffdaq.com/"], :root [class^="div-gpt-ad"], :root a[href^="http://tc.tradetracker.net/"] > img, :root [href^="https://affiliate.fastcomet.com/"] > img, :root [class^="adDisplay-module"], :root [data-freestar-ad][id], :root AD-SLOT, :root a[href^="https://www.googleadservices.com/pagead/aclk?"] > img, :root [data-ad-module], :root a[href^="https://go.skinstrip.net"][href*="?campaignId="], :root #teaser2[style^="width:autopx;"], :root a[href^="https://ngineet.cfd/"], :root [data-revive-zoneid], :root a[href^="https://losingoldfry.com/"], :root div[id^="div-gpt-"], :root a[href^="https://gml-grp.com/"], :root .ob_dual_right > .ob_ads_header ~ .odb_div, :root a[href^="https://cam4com.go2cloud.org/"], :root a[href^="http://li.blogtrottr.com/click?"], :root a[href^="https://t.ajump1.com/"], :root a[href^="https://go.xxxjmp.com"], :root #leader-companion > a[href], :root #target.pk-page-ready #pk-status-message { display: none !important; }</style><style wix-style="">.Title{ font:normal normal normal 43px/1.1em tahoma,tahoma-w01-regular,tahoma-w02-regular,tahoma-w10-regular,tahoma-w15--regular,tahoma-w99-regular,sans-serif; } .Menu{ font:normal normal normal 12px/1.1em tahoma,tahoma-w01-regular,tahoma-w02-regular,tahoma-w10-regular,tahoma-w15--regular,tahoma-w99-regular,sans-serif; } .Page-title{ font:normal normal normal 24px/1.1em tahoma,tahoma-w01-regular,tahoma-w02-regular,tahoma-w10-regular,tahoma-w15--regular,tahoma-w99-regular,sans-serif; } .Heading-XL{ font:normal normal normal 60px/1.1em tahoma,tahoma-w01-regular,tahoma-w02-regular,tahoma-w10-regular,tahoma-w15--regular,tahoma-w99-regular,sans-serif; } .Heading-L{ font:normal normal normal 40px/1.3em tahoma,tahoma-w01-regular,tahoma-w02-regular,tahoma-w10-regular,tahoma-w15--regular,tahoma-w99-regular,sans-serif; } .Heading-M{ font:normal normal normal 28px/1.2em tahoma,tahoma-w01-regular,tahoma-w02-regular,tahoma-w10-regular,tahoma-w15--regular,tahoma-w99-regular,sans-serif; } .Heading-S{ font:normal normal normal 22px/1.3em tahoma,tahoma-w01-regular,tahoma-w02-regular,tahoma-w10-regular,tahoma-w15--regular,tahoma-w99-regular,sans-serif; } .Body-L{ font:normal normal normal 16px/1.3em tahoma,tahoma-w01-regular,tahoma-w02-regular,tahoma-w10-regular,tahoma-w15--regular,tahoma-w99-regular,sans-serif; } .Body-M{ font:normal normal normal 14px/1.4em tahoma,tahoma-w01-regular,tahoma-w02-regular,tahoma-w10-regular,tahoma-w15--regular,tahoma-w99-regular,sans-serif; } .Body-S{ font:normal normal normal 12px/1.3em tahoma,tahoma-w01-regular,tahoma-w02-regular,tahoma-w10-regular,tahoma-w15--regular,tahoma-w99-regular,sans-serif; } .Body-XS{ font:normal normal normal 11px/1.3em tahoma,tahoma-w01-regular,tahoma-w02-regular,tahoma-w10-regular,tahoma-w15--regular,tahoma-w99-regular,sans-serif; } }</style><link type="text/css" rel="stylesheet" href="./6eedcb314db991b442fd.css"><link type="text/css" rel="stylesheet" href="./b90d5b337f79413a57d3.css"><link type="text/css" rel="stylesheet" href="https://wix.ecwid.com/wix/app/cart_v2?pageId=masterPage&amp;compId=comp-jpbj95eq&amp;viewerCompId=comp-jpbj95eq&amp;siteRevision=4&amp;viewMode=site&amp;deviceType=desktop&amp;locale=es&amp;regionalLanguage=es&amp;width=106&amp;height=106&amp;instance=64eh77MfwtlCrsi9bNA71M-s5t2KOk6e8O9IpcBlyYE.eyJpbnN0YW5jZUlkIjoiYzZjYTY2ZWMtNzAxNy00M2ZkLTg2N2UtMmJlNDgxYTFlMWViIiwiYXBwRGVmSWQiOiIxMmYxZmJhYi04YjlkLTMwMDItODdiNS0yOTcyODk3ZTgzMTQiLCJzaWduRGF0ZSI6IjIwMjUtMDEtMDhUMTM6NDA6NDYuMDIwWiIsImRlbW9Nb2RlIjpmYWxzZSwiYWlkIjoiZjA2MjVhMjUtOTY1Ny00ZmFlLTgyYzYtZmFjNWJkYzIyMzBmIiwic2l0ZU93bmVySWQiOiIyODkyZDdjOC03YmVkLTRmM2ItYjFmNC04NDg1NWQ5MDdjNzUifQ&amp;currency=USD&amp;currentCurrency=USD&amp;commonConfig=%7B%22brand%22%3A%22wix%22%2C%22host%22%3A%22VIEWER%22%2C%22bsi%22%3A%22f8f4b36b-fea9-457f-8645-932698f39810%7C1%22%2C%22siteRevision%22%3A%224%22%2C%22branchId%22%3A%2249f657f4-c442-4e5f-9ac8-1c4e02aa8797%22%2C%22renderingFlow%22%3A%22NONE%22%2C%22language%22%3A%22es%22%2C%22locale%22%3A%22%22%2C%22BSI%22%3A%22f8f4b36b-fea9-457f-8645-932698f39810%7C1%22%7D&amp;currentRoute=.%2F&amp;vsi=6eefc2a2-c284-4331-98b5-1f33c04976bd"><style>:focus {
+    outline: none;
+}
+
+.js-focus-visible .focus-visible:focus,
+.js-focus-visible .focus-visible:focus ~ .wixSdkShowFocusOnSibling
+{
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.9), 0 0 1px 2px #3899EC;
+}
+</style><script src="./focus-visible.min.js.descarga" id="dynamic_script_FOCUS_VISIBLE"></script><link rel="modulepreload" as="script" crossorigin="" href="https://d34ikvsdm2rlij.cloudfront.net/storefront/static/2024/2024-56339-g11143a2892a07a/apps-startup.js"><link rel="modulepreload" as="script" crossorigin="" href="https://d34ikvsdm2rlij.cloudfront.net/storefront/static/2024/2024-56339-g11143a2892a07a/shared.js"><link rel="modulepreload" as="script" crossorigin="" href="https://d34ikvsdm2rlij.cloudfront.net/storefront/static/2024/2024-56339-g11143a2892a07a/vendor.js"><link rel="stylesheet" href="./new" data-ec-stylesheet=""><script type="text/javascript" src="./new-frontend.es_ES.500519874.js.descarga" async=""></script><link rel="modulepreload" as="script" crossorigin="" href="https://d34ikvsdm2rlij.cloudfront.net/storefront/static/2024/2024-56339-g11143a2892a07a/apps-js-api.js"><link rel="modulepreload" as="script" crossorigin="" href="https://d34ikvsdm2rlij.cloudfront.net/storefront/static/2024/2024-56339-g11143a2892a07a/apps-minicart-v2.js"></head>
+<body id="cart-widget" class="wix-widget js-focus-visible">
+	<script type="text/javascript" src="./script.js.descarga" charset="utf-8"></script>
+
+	<script type="text/javascript">
+		if (Ecwid.isStorefrontV3 && Ecwid.isStorefrontV3()) {
+			window.ec.config.useExternalState = true;
+			window.ec.config.storefrontUrls = window.ec.config.storefrontUrls || {}
+			window.ec.config.storefrontUrls.cleanUrls = true
+		}
+
+		$(window).ready(function() {
+			Ecwid.OnAPILoaded.add(function() {
+				Wix.PubSub.subscribe("ecwid_cart_changed", function(event) {
+					EcwidCart.refreshCartInfo({ cart: event.data.cart });
+				});
+				if (Ecwid.isStorefrontV3 && Ecwid.isStorefrontV3()) {
+					let session = undefined;
+					Wix.PubSub.subscribe("ecwid_session_changed", function(event) {
+						session = event.data.session;
+					});
+
+					Wix.PubSub.subscribe("ecwid_cart_synchronized", function() {
+						if (session !== undefined) {
+							Ecwid.setSession(session);
+							session = undefined;
+						} else {
+							EcwidCart.refreshCartInfo({ shouldRefetchCart: true });
+						}
+					});
+
+					Wix.PubSub.subscribe("ecwid_state_changed", onEcwidStateChanged)
+				}
+			});
+
+			addRouteChangeEventListener("CART");
+
+			Wix.getSiteInfo(function(siteInfo) {
+				window.ecwid_ProductBrowserURL = siteInfo.url;
+			});
+		});
+	</script>
+
+	<div class="ec-cart-widget" id="minicart-v2" data-fixed="true" data-fixed-position="TOP_RIGHT" data-responsive="false" data-v-app=""><div class="ec-minicart ec-minicart--empty ec-storefront-v3 ec-minicart--m ec-minicart--fixed ec-minicart--top ec-minicart--right ec-minicart--pill ec-minicart--animation-default" tabindex="0" role="button" aria-label="Carrito de compras"><div class="ec-minicart__body"><div class="ec-minicart__icon"><svg class="icon-default" width="36" height="30" viewBox="0 0 36 30" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><path d="M7 7h22v18a4 4 0 0 1-4 4H11a4 4 0 0 1-4-4V7z" stroke="currentColor" stroke-width="2"></path><path d="M13 10V6c0-2.993 2.009-5 5-5s5 2.026 5 5v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path><circle class="cart-not-empty" cx="18" cy="18" r="4" fill="currentColor"></circle></g></svg></div><!----><div class="ec-minicart__wrap"><div class="ec-minicart__counter">0</div><!----><!----></div></div></div></div>
+	<div id="minicart-v1"></div>
+
+	<script type="text/javascript">
+		if (isInsideWixEditor()) {
+			initMinicartV1();
+			initMinicartV2();
+				hideMinicartV1();
+		} else {
+				initMinicartV2();
+		}
+
+		function initMinicartV1() {
+			if (!minicartV1IsInitialized) {
+				xMinicart("style=", "layout=", "id=minicart-v1");
+				minicartV1IsInitialized = true;
+			}
+		}
+
+		function initMinicartV2() {
+			if (!minicartV2IsInitialized) {
+				Ecwid.init();
+				minicartV2IsInitialized = true;
+			}
+		}
+
+		function showMinicartV1() {
+			initMinicartV1();
+			$('#minicart-v1').show();
+		}
+
+		function hideMinicartV1() {
+			$('#minicart-v1').hide();
+		}
+
+		function showMinicartV2() {
+			initMinicartV2();
+			$('#minicart-v2').show();
+		}
+
+		function hideMinicartV2() {
+			$('#minicart-v2').hide();
+		}
+	</script>
+
+
+
+</body></html>
